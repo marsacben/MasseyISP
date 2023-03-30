@@ -1,10 +1,6 @@
 import pandas as pd
 import numpy as np
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
 def finDir():
     import os
     for f in os.listdir("/"):
@@ -15,7 +11,15 @@ def readData(x):
         pathGames = 'Data/MasseyGameData - MasseyExampleData.csv'
         pathTeams ='Data/MasseyGameData - teamsExample.csv'
 
-    if x==2:
+    if x == 1:
+        pathGames = 'Data/MasseyGameData - ProNational.csv'
+        pathTeams = 'Data/MasseyGameData - NationalCProTeams.csv'
+
+    if x == 2:
+        pathGames = 'Data/MasseyGameData - AmericanConferenceProGames.csv'
+        pathTeams = 'Data/MasseyGameData - AmericanCProTeams.csv'
+
+    if x==3:
         pathGames ='Data/MasseyGameData - OnlyPro.csv'
         pathTeams= 'Data/MasseyGameData - ProTeams.csv'
 
@@ -29,26 +33,47 @@ def readData(x):
 
     return data, teams
 
+def calcOffDef():
+    # instantiating matrices
+    y = np.zeros(shape=(len(data.PointsA)*2))
+    X = np.zeros(shape=(len(data.PointsA)*2, len(teams)*2))
+    # print(X, y)
 
+    # setting matrix values based on data
+    i=0
+    for r in data.index:
+        A = data['TeamA'][r]
+        B = data['TeamB'][r]
+        indexA= np.where(teams.Team == A)[0][0] * 2
+        indexB = np.where(teams.Team == B)[0][0] * 2
+        #points scored by A
+        X[i][indexA] = 1
+        X[i][indexB + 1] = -1
+        y[i]= data['PointsA'][r]
+        # points scored by B
+        i +=1
+        X[i][indexA +1] = -1
+        X[i][indexB] = 1
+        y[i] = data['PointsB'][r]
+        i += 1
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    data, teams = readData(0)
+    return X, y
 
+def simpleLeastSquares():
     # instantiating matrices
     y = np.zeros(shape=(len(data.PointsA)))
     X = np.zeros(shape=(len(data.PointsA), len(teams)))
-    #print(X, y)
+    # print(X, y)
 
     # setting matrix values based on data
 
     # for y
     for i in range(len(data.PointsA)):
         y[i] = data.PointsA[i] - data.PointsB[i]
-    #print(y)
+    print(y)
 
     # for X
-    i = 0;
+    i = 0
     for t in teams.Team:
         for r in data.index:
             if t == data['TeamA'][r]:
@@ -56,7 +81,53 @@ if __name__ == '__main__':
             if t == data['TeamB'][r]:
                 X[r][i] = -1
         i = i + 1
-    #print(X)
+    print("original X\n", X)
+    return X, y
+
+def printRatingsTable(x):
+    if x== 1:
+        RatingsTable = pd.DataFrame({"team": teams.Team, "rating": R}).sort_values(by='rating',ascending=False)
+        print("\n Ratings Table:\n", RatingsTable)
+        return RatingsTable
+    if x==2:
+        s = int(len(R) / 2)
+        off = [0] * s
+        deff = [0] * s
+        total = [0] * s
+        i = 0
+        flag = True
+        for r in R:
+            total[i] += r
+            if flag:
+                off[i] = r
+                flag = False
+            else:
+                deff[i] = r
+                i += 1
+                flag = True
+
+        RatingsTable = pd.DataFrame({"team": teams.Team, "Offense": off, "Defense": deff, "rating": total}).sort_values(by='rating', ascending=False)
+        print("\n Ratings Table:\n", RatingsTable)
+        return RatingsTable
+
+def setSystemOfEquations(x):
+    # 1 for just basic least squares r
+    # 2 to split rating into offence and defence
+    if(x==1):
+        return simpleLeastSquares()
+    if(x==2):
+        return calcOffDef()
+
+
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    rankType = 2 # 0=solve for rating, 2=solve for offense and defense rating
+    dataset = 3 #0=exampleset, 1=national, 2=american, 3=all pro
+
+    data, teams = readData(dataset)
+    #print(teams.shape)
+    X,y = setSystemOfEquations(rankType)
+    #print("X:\n", X, "\ny:\n", y, "\n")
 
     # calculating X transpose
     Xt = X.transpose()
@@ -80,14 +151,13 @@ if __name__ == '__main__':
 
     # setting the last row of Y to 0
     Y[-1] = 0
-    print("The system of lenear equations to solve is:")
+    print("The system of linear equations to solve is:")
     print("M=", M)
     print("\nY=", Y)
 
     # solving the system of linear equations
     R = np.linalg.solve(M, Y)
-    #print(R)
+    print("R:\n", R)
 
     # printing team ratings in order
-    RatingsTable = pd.DataFrame({"team": teams.Team, "rating": R}).sort_values(by='rating', ascending=False)
-    print("\n Ratings Table:\n", RatingsTable)
+    printRatingsTable(rankType)
