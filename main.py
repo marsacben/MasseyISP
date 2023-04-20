@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from tabulate import tabulate
 import scipy.stats as stats
 
 def finDir():
@@ -181,22 +182,48 @@ def strengthTable():
         teams.PointsAgainst[indexB].append(data['PointsA'][g])
     #print(teams)
     return
+def non_zero(x):
+    if x==0:
+        return 0.9
+    else:
+        return x
 
-def bayesianCorrection(RatingsTable):
-    RatingsTable['BayesianFactor'] = 1
+def recordTable(ratings):
+    ratings["Won"] = [0 for x in range(len(ratings))]
+    ratings["Lost"] = [0 for x in range(len(ratings))]
+    ratings["PredictedWin"] = [0 for x in range(len(ratings))]
+    ratings["PredictedLosses"] = [0 for x in range(len(ratings))]
+
     for g in data.index:
         A = data['TeamA'][g]
         B = data['TeamB'][g]
-        indexA = np.where(RatingsTable.team == A)[0][0]
-        indexB = np.where(RatingsTable.team == B)[0][0]
-        pA = data['PointsA'][indexA]
-        pB =data['PointsB'][indexB]
-        rA= RatingsTable['rating'][indexA]
-        rB = RatingsTable['rating'][indexB]
-        RatingsTable['BayesianFactor'][indexA] = GameOutcomeFunction(pA,[pA,pB])/(rA/(abs(rA)+abs(rB)))
-        #RatingsTable['BayesianFactor'][indexA] = RatingsTable['BayesianFactor'][indexA] * (GameOutcomeFunction(rA, [rA,rB])/(1-GameOutcomeFunction(rA, [rA,rB])))/((RatingsTable['rating'][indexA] + abs(RatingsTable['rating'][indexB]))/ (RatingsTable['rating'][indexA] -RatingsTable['rating'][indexB]))
-    #RatingsTable['BasyesianCorrectedRating'] = RatingsTable.rating * RatingsTable.BayesianFactor
-    print(RatingsTable)
+        indexA = np.where(ratings.team == A)[0][0]
+        indexB = np.where(ratings.team == B)[0][0]
+        #print(A, data['PointsA'][g], teams.PointsFor[indexA])
+        ratings.at[indexA, 'Won']+=1
+        ratings.at[indexB, 'Lost']+=1
+        rA = ratings['rating'].values[ratings['team'] == A][0]
+        rB = ratings['rating'].values[ratings['team'] == B][0]
+        if (rA>rB):
+            ratings.at[indexA, 'PredictedWin'] += 1
+            ratings.at[indexB, 'PredictedLosses'] += 1
+        elif (rA<rB):
+            ratings.at[indexB, 'PredictedWin'] += 1
+            ratings.at[indexA, 'PredictedLosses'] += 1
+    ratings['PredictedWin'] = ratings['PredictedWin'].map(lambda x: non_zero(x))
+    ratings['percentWin'] = ratings.apply(lambda row: row.Won/(row.Won + row.Lost), axis=1)
+    ratings['predictedOutcome'] = ratings.apply(lambda row: row.PredictedWin / (row.PredictedWin + row.PredictedLosses), axis=1)
+    ratings['BayesianFactor'] = ratings.apply(lambda row: row.percentWin / row.predictedOutcome, axis=1)
+    print(ratings)
+    return
+
+def bayesianCorrection(RatingsTable):
+    min = -RatingsTable['rating'].min()
+    RatingsTable['rating'] = RatingsTable['rating'].map(lambda r: (r+min)*10)
+    RatingsTable['Bayesian_corrected_Rating'] = RatingsTable.apply(lambda row: row.rating * row.BayesianFactor, axis=1)
+    RatingsTable['Bayesian_correction_change'] = RatingsTable.apply(lambda row: row.Bayesian_corrected_Rating - row.rating, axis=1)
+    RatingsTable =RatingsTable.sort_values(by='Bayesian_corrected_Rating', ascending=False)
+    print(tabulate(RatingsTable,headers=RatingsTable.columns, tablefmt='fancy_grid'))
     return RatingsTable
 
 
@@ -206,213 +233,13 @@ def bayesianCorrection(RatingsTable):
 if __name__ == '__main__':
     rankType = 2 # 0=solve for rating, 2=solve for offense and defense rating
     dataset = 3 #0=exampleset, 1=national, 2=american, 3=all pro
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    GOF=  1#0=1, 1=gof, 2=none
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    GOF=  1## 0=1 point for winning 1= normal distribution prob  2=none
 
     data, teams = readData(dataset)
-    strengthTable()
+    #strengthTable()
     #print(teams.shape)
     X,y = setSystemOfEquations(rankType, GOF)
-    print("X:\n", X, "\ny:\n", y, "\n")
+    #print("X:\n", X, "\ny:\n", y, "\n")
 
     # calculating X transpose
     Xt = X.transpose()
@@ -435,14 +262,15 @@ if __name__ == '__main__':
 
     # setting the last row of Y to 0
     Y[-1] = 0
-    print("The system of linear equations to solve is:")
-    print("M=", M)
-    print("\nY=", Y)
+    #print("The system of linear equations to solve is:")
+    #print("M=", M)
+    #print("\nY=", Y)
 
     # solving the system of linear equations
     R = np.linalg.solve(M, Y)
-    print("R:\n", R)
+    #print("R:\n", R)
 
     # printing team ratings in order
     RatingsTable = printRatingsTable(rankType)
+    recordTable(RatingsTable)
     bayesianCorrection(RatingsTable)
