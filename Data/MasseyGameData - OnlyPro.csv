@@ -8,7 +8,7 @@ Boston Renegades,69,DC,28
 Tampa Bay,9,DC,0
 Pittsburgh,36,DC,12
 Pittsburgh,27,Detroit,8
-Detrioit,28,Pittsburgh,19
+Detroit,28,Pittsburgh,19
 St Louis,20,Minnesota Vixen,18
 Minnesota Vixen,42,Arlington,26
 Nevada,28,Minnesota Vixen,26
@@ -17,3 +17,10 @@ Cali War,54,Nevada,52
 Arlington,56,Cali War,18
 Cali War,20,Nevada,12
 Arlington,34,Dallas,7
+Minnesota Vixen,27,Nevada,10
+Minnesota Vixen,36,Cali War,30
+Boston Renegades,32,Minnesota Vixen,12
+Boston Renegades,42,Pittsburgh,24
+Cali War,30,Arlington,25
+Boston Renegades,69,DC,32
+Pittsburgh,27,Tampa Bay,21

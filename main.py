@@ -1,9 +1,6 @@
 import pandas as pd
 import numpy as np
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+import scipy.stats as stats
 
 def finDir():
     import os
@@ -15,7 +12,15 @@ def readData(x):
         pathGames = 'Data/MasseyGameData - MasseyExampleData.csv'
         pathTeams ='Data/MasseyGameData - teamsExample.csv'
 
-    if x==2:
+    if x == 1:
+        pathGames = 'Data/MasseyGameData - ProNational.csv'
+        pathTeams = 'Data/MasseyGameData - NationalCProTeams.csv'
+
+    if x == 2:
+        pathGames = 'Data/MasseyGameData - AmericanConferenceProGames.csv'
+        pathTeams = 'Data/MasseyGameData - AmericanCProTeams.csv'
+
+    if x==3:
         pathGames ='Data/MasseyGameData - OnlyPro.csv'
         pathTeams= 'Data/MasseyGameData - ProTeams.csv'
 
@@ -28,27 +33,82 @@ def readData(x):
     print("\n",teams, "\n")
 
     return data, teams
+def calcOffDef2(gof):
+    # instantiating matrices
+    y = np.zeros(shape=(len(data.PointsA)*2))
+    X = np.zeros(shape=(len(data.PointsA)*2, len(teams)*2))
+    # print(X, y)
 
+    # setting matrix values based on data
+    i=0
+    for r in data.index:
+        A = data['TeamA'][r]
+        B = data['TeamB'][r]
+        indexA= np.where(teams.Team == A)[0][0]
+        indexB = np.where(teams.Team == B)[0][0]
+        #points scored by A
+        X[i][indexA* 2] = 1
+        X[i][(indexB* 2) + 1] = -1
+        #print(teams['PointsAgainst'][indexA], A, "hi", data['PointsA'][r], np.std(teams['PointsAgainst'][indexA]))
+        pA = data['PointsA'][r]
+        pB = data['PointsB'][r]
+        if gof==0:
+            y[i] = 1
+        else:
+            y[i] = GameOutcomeFunction(pA, [pA, pB])
+        # points scored by B
+        i +=1
+        X[i][(indexA * 2) +1] = -1
+        X[i][indexB* 2] = 1
+        if gof==0:
+            y[i] = -1
+        else:
+            y[i] = GameOutcomeFunction(pB, [pA, pB])
+        i += 1
 
+    return X, y
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    data, teams = readData(0)
+def calcOffDef():
+    # instantiating matrices
+    y = np.zeros(shape=(len(data.PointsA)*2))
+    X = np.zeros(shape=(len(data.PointsA)*2, len(teams)*2))
+    # print(X, y)
 
+    # setting matrix values based on data
+    i=0
+    for r in data.index:
+        A = data['TeamA'][r]
+        B = data['TeamB'][r]
+        indexA= np.where(teams.Team == A)[0][0] * 2
+        indexB = np.where(teams.Team == B)[0][0] * 2
+        #points scored by A
+        X[i][indexA] = 1
+        X[i][indexB + 1] = -1
+        y[i]= data['PointsA'][r]
+        # points scored by B
+        i +=1
+        X[i][indexA +1] = -1
+        X[i][indexB] = 1
+        y[i] = data['PointsB'][r]
+        i += 1
+
+    return X, y
+
+def simpleLeastSquares():
     # instantiating matrices
     y = np.zeros(shape=(len(data.PointsA)))
     X = np.zeros(shape=(len(data.PointsA), len(teams)))
-    #print(X, y)
+    # print(X, y)
 
     # setting matrix values based on data
 
     # for y
     for i in range(len(data.PointsA)):
         y[i] = data.PointsA[i] - data.PointsB[i]
-    #print(y)
+    print(y)
 
     # for X
-    i = 0;
+    i = 0
     for t in teams.Team:
         for r in data.index:
             if t == data['TeamA'][r]:
@@ -56,7 +116,303 @@ if __name__ == '__main__':
             if t == data['TeamB'][r]:
                 X[r][i] = -1
         i = i + 1
-    #print(X)
+    print("original X\n", X)
+    return X, y
+
+def printRatingsTable(x):
+    if x== 1:
+        RatingsTable = pd.DataFrame({"team": teams.Team, "rating": R}).sort_values(by='rating',ascending=False)
+        print("\n Ratings Table:\n", RatingsTable)
+        return RatingsTable
+    if x==2:
+        s = int(len(R) / 2)
+        off = [0] * s
+        deff = [0] * s
+        total = [0] * s
+        i = 0
+        flag = True
+        for r in R:
+            total[i] += r
+            if flag:
+                off[i] = r
+                flag = False
+            else:
+                deff[i] = r
+                i += 1
+                flag = True
+
+        RatingsTable = pd.DataFrame({"team": teams.Team, "Offense": off, "Defense": deff, "rating": total}).sort_values(by='rating', ascending=False)
+        print("\n Ratings Table:\n", RatingsTable)
+        return RatingsTable
+
+def setSystemOfEquations(x,gof):
+    # 1 for just basic least squares r
+    # 2 to split rating into offence and defence
+    if(x==1):
+        return simpleLeastSquares()
+    if(x==2):
+        if(gof == 0 or gof == 1):
+            return calcOffDef2(gof)
+        else:
+            return calcOffDef()
+
+def GameOutcomeFunction(x, arr):
+    from scipy.stats import norm
+    mean = np.mean(arr)
+    std = pow((50* np.sum(arr)),0.25)
+    dist = norm(mean, std)
+    cdf = dist.cdf(x)
+    return cdf
+
+
+def strengthTable():
+    teams["PointsFor"] = [[] for x in range(len(teams))]
+    teams["PointsAgainst"] = [[] for x in range(len(teams))]
+
+    for g in data.index:
+        A = data['TeamA'][g]
+        B = data['TeamB'][g]
+        indexA = np.where(teams.Team == A)[0][0]
+        indexB = np.where(teams.Team == B)[0][0]
+        #print(A, data['PointsA'][g], teams.PointsFor[indexA])
+        teams.PointsFor[indexA].append(data['PointsA'][g])
+        teams.PointsAgainst[indexA].append(data['PointsB'][g])
+        teams.PointsFor[indexB].append(data['PointsB'][g])
+        teams.PointsAgainst[indexB].append(data['PointsA'][g])
+    #print(teams)
+    return
+
+def bayesianCorrection(RatingsTable):
+    RatingsTable['BayesianFactor'] = 1
+    for g in data.index:
+        A = data['TeamA'][g]
+        B = data['TeamB'][g]
+        indexA = np.where(RatingsTable.team == A)[0][0]
+        indexB = np.where(RatingsTable.team == B)[0][0]
+        pA = data['PointsA'][indexA]
+        pB =data['PointsB'][indexB]
+        rA= RatingsTable['rating'][indexA]
+        rB = RatingsTable['rating'][indexB]
+        RatingsTable['BayesianFactor'][indexA] = GameOutcomeFunction(pA,[pA,pB])/(rA/(abs(rA)+abs(rB)))
+        #RatingsTable['BayesianFactor'][indexA] = RatingsTable['BayesianFactor'][indexA] * (GameOutcomeFunction(rA, [rA,rB])/(1-GameOutcomeFunction(rA, [rA,rB])))/((RatingsTable['rating'][indexA] + abs(RatingsTable['rating'][indexB]))/ (RatingsTable['rating'][indexA] -RatingsTable['rating'][indexB]))
+    #RatingsTable['BasyesianCorrectedRating'] = RatingsTable.rating * RatingsTable.BayesianFactor
+    print(RatingsTable)
+    return RatingsTable
+
+
+
+
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+    rankType = 2 # 0=solve for rating, 2=solve for offense and defense rating
+    dataset = 3 #0=exampleset, 1=national, 2=american, 3=all pro
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    GOF=  1#0=1, 1=gof, 2=none
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    data, teams = readData(dataset)
+    strengthTable()
+    #print(teams.shape)
+    X,y = setSystemOfEquations(rankType, GOF)
+    print("X:\n", X, "\ny:\n", y, "\n")
 
     # calculating X transpose
     Xt = X.transpose()
@@ -74,20 +430,19 @@ if __name__ == '__main__':
 
     # making sure all the ratings add up to 0
     # setting the last row OF m TO 1's
-    M[-1]
     for i in range(len(M[-1])):
         M[-1][i] = 1
 
     # setting the last row of Y to 0
     Y[-1] = 0
-    print("The system of lenear equations to solve is:")
+    print("The system of linear equations to solve is:")
     print("M=", M)
     print("\nY=", Y)
 
     # solving the system of linear equations
     R = np.linalg.solve(M, Y)
-    #print(R)
+    print("R:\n", R)
 
     # printing team ratings in order
-    RatingsTable = pd.DataFrame({"team": teams.Team, "rating": R}).sort_values(by='rating', ascending=False)
-    print("\n Ratings Table:\n", RatingsTable)
+    RatingsTable = printRatingsTable(rankType)
+    bayesianCorrection(RatingsTable)
