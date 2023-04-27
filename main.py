@@ -234,7 +234,6 @@ def testingGOF():
     print(t)
 
 
-
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     rankType = 2 # 0=solve for rating, 2=solve for offense and defense rating
