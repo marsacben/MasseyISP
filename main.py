@@ -218,14 +218,20 @@ def recordTable(ratings):
     return
 
 def bayesianCorrection(RatingsTable):
-    min = -RatingsTable['rating'].min()
-    RatingsTable['rating'] = RatingsTable['rating'].map(lambda r: (r+min)*10)
+    min = abs(RatingsTable['rating'].min())
+    RatingsTable['rating'] = RatingsTable['rating'].map(lambda r: (r+min+0.1)*5)
     RatingsTable['Bayesian_corrected_Rating'] = RatingsTable.apply(lambda row: row.rating * row.BayesianFactor, axis=1)
     RatingsTable['Bayesian_correction_change'] = RatingsTable.apply(lambda row: row.Bayesian_corrected_Rating - row.rating, axis=1)
     RatingsTable =RatingsTable.sort_values(by='Bayesian_corrected_Rating', ascending=False)
     print(tabulate(RatingsTable,headers=RatingsTable.columns, tablefmt='fancy_grid'))
     return RatingsTable
 
+def testingGOF():
+    t = pd.DataFrame({'PointsA': [30,10,27,27,50,10,30,45,45,30,56],
+                    'PointsB': [29,9,24,20,40,0,14,21,14,0,3],
+                    'MasseyGOF(pA,pB)': [0.527,0.5359,0.5836,0.6924,0.7292,0.8548,0.8786, 0.9433,0.9823,0.9920, 0.9998]})
+    t['myGOF(pA,pB)'] = t.apply(lambda r: GameOutcomeFunction(r.PointsA, [r.PointsA, r.PointsB]), axis = 1)
+    print(t)
 
 
 
